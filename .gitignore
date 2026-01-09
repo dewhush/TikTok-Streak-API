@@ -1,7 +1,3 @@
-# Sensitive files - DO NOT COMMIT
-cookies.json
-contacts.json
-
 # Logs
 logs/
 *.log
