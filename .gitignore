@@ -1,0 +1,27 @@
+# Sensitive files - DO NOT COMMIT
+cookies.json
+contacts.json
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
