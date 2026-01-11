@@ -219,6 +219,37 @@ class TikTokStreakBot:
             
             if 'messages' in current_url:
                 logger.info("✅ Login verified - on messages page")
+                
+                # Handle "Maybe later" popup if it appears
+                try:
+                    logger.info("Checking for popups...")
+                    time.sleep(2)  # Wait for potential popup to appear
+                    
+                    # Try to find and click "Maybe later" button
+                    maybe_later_selectors = [
+                        'xpath://button[contains(text(), "Maybe later")]',
+                        'xpath://button[contains(text(), "maybe later")]',
+                        'xpath://button[contains(text(), "MAYBE LATER")]',
+                        'xpath://span[contains(text(), "Maybe later")]/parent::button',
+                        'css:button[aria-label*="Maybe later"]',
+                        'css:button[class*="maybe"]',
+                    ]
+                    
+                    for selector in maybe_later_selectors:
+                        try:
+                            button = self.page.ele(selector, timeout=2)
+                            if button:
+                                logger.info("Found 'Maybe later' button, clicking...")
+                                button.click()
+                                time.sleep(1)
+                                logger.info("✅ Popup dismissed")
+                                break
+                        except:
+                            continue
+                    
+                except Exception as e:
+                    logger.debug(f"No popup found or error dismissing popup: {e}")
+                
                 return True
             
             logger.warning(f"Unexpected URL: {current_url}")

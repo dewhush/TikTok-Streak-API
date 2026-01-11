@@ -434,17 +434,21 @@ def main():
     # Send startup notification
     async def send_startup_message(app):
         contacts = load_contacts()
+        current_msg = custom_message if custom_message else STREAK_MESSAGE
         await app.bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
             text=(
-                "<b>TikTok Streak Bot Online!</b>\n\n"
-                f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"Contacts: {len(contacts)}\n"
-                f"Scheduled: {SCHEDULE_TIME} daily\n\n"
+                "<b>🤖 TikTok Streak Bot Online!</b>\n\n"
+                f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"👥 Contacts: {len(contacts)}\n"
+                f"📅 Scheduled: {SCHEDULE_TIME} daily\n"
+                f"📝 Message: <code>{current_msg}</code>\n\n"
                 "<b>Commands:</b>\n"
                 "/add {nickname} - Add contact\n"
                 "/remove {nickname} - Remove contact\n"
                 "/list - Show contacts\n"
+                "/text {message} - Change message\n"
+                "/status - Show bot status\n"
                 "/run - Run streak bot"
             ),
             parse_mode='HTML'
