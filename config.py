@@ -18,7 +18,7 @@ STREAK_MESSAGE = "🔥 Streak Reminder 🔥 - Dew Bot"
 # Schedule Settings
 # =============================================================================
 # Time to send streak messages (24-hour format)
-SCHEDULE_TIME = "07:00"
+SCHEDULE_TIME = "00:00"
 
 # =============================================================================
 # Telegram Notification Settings
