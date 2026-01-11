@@ -4,9 +4,11 @@ TikTok Streak Bot
 Automatically sends streak reminder messages to specified TikTok contacts.
 
 Usage:
-    python streak_bot.py           # Run bot (schedules at 7 AM daily)
-    python streak_bot.py --now     # Send messages immediately
-    python streak_bot.py --test    # Test mode (find contacts but don't send)
+    python streak_bot.py                        # Run bot (schedules at 7 AM daily)
+    python streak_bot.py --now                  # Send messages immediately
+    python streak_bot.py --test                 # Test mode (find contacts but don't send)
+    python streak_bot.py --message "Custom"     # Use custom message
+    python streak_bot.py --help                 # Show help
 """
 
 import json
@@ -91,17 +93,19 @@ def send_telegram(message):
 class TikTokStreakBot:
     """Bot to automatically send streak messages on TikTok."""
     
-    def __init__(self, headless=False, test_mode=False):
+    def __init__(self, headless=False, test_mode=False, custom_message=None):
         """
         Initialize the TikTok Streak Bot.
         
         Args:
             headless: Run browser in headless mode
             test_mode: If True, find contacts but don't send messages
+            custom_message: Custom message to send (overrides config)
         """
         self.page = None
         self.headless = headless
         self.test_mode = test_mode
+        self.custom_message = custom_message
         self.target_usernames = []
         self.contacts_found = []
     
@@ -129,35 +133,45 @@ class TikTokStreakBot:
             return True
             
         except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in contacts.json: {e}")
+            error_msg = f"Invalid JSON in contacts.json: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Config Error</b>\n{error_msg}")
             return False
         except Exception as e:
-            logger.error(f"Error loading contacts: {e}")
+            error_msg = f"Error loading contacts: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Contact Load Error</b>\n{error_msg}")
             return False
     
     def create_browser(self):
         """Create a ChromiumPage browser instance with anti-detection settings."""
-        options = ChromiumOptions()
-        
-        # Anti-detection settings
-        options.set_argument('--disable-blink-features=AutomationControlled')
-        options.set_argument('--disable-infobars')
-        options.set_argument('--disable-dev-shm-usage')
-        options.set_argument('--no-sandbox')
-        
-        # Headless mode
-        if self.headless:
-            options.set_argument('--headless=new')
-        
-        # Set a realistic user agent
-        options.set_user_agent(
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-            '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        )
-        
-        self.page = ChromiumPage(options)
-        logger.info("Browser initialized successfully")
-        return self.page
+        try:
+            options = ChromiumOptions()
+            
+            # Anti-detection settings
+            options.set_argument('--disable-blink-features=AutomationControlled')
+            options.set_argument('--disable-infobars')
+            options.set_argument('--disable-dev-shm-usage')
+            options.set_argument('--no-sandbox')
+            
+            # Headless mode
+            if self.headless:
+                options.set_argument('--headless=new')
+            
+            # Set a realistic user agent
+            options.set_user_agent(
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            )
+            
+            self.page = ChromiumPage(options)
+            logger.info("Browser initialized successfully")
+            return self.page
+        except Exception as e:
+            error_msg = f"Error creating browser: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Browser Error</b>\n{error_msg}")
+            raise
     
     def load_cookies(self):
         """Load cookies from file and apply to browser."""
@@ -185,7 +199,9 @@ class TikTokStreakBot:
             return True
             
         except Exception as e:
-            logger.error(f"Error loading cookies: {e}")
+            error_msg = f"Error loading cookies: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Cookie Error</b>\n{error_msg}")
             return False
     
     def verify_login(self):
@@ -209,7 +225,9 @@ class TikTokStreakBot:
             return False
             
         except Exception as e:
-            logger.error(f"Error verifying login: {e}")
+            error_msg = f"Error verifying login: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Login Verification Error</b>\n{error_msg}")
             return False
     
     def find_target_contacts(self):
@@ -266,8 +284,9 @@ class TikTokStreakBot:
                                                     logger.info(f"✅ Found target contact: {target}")
                                                     found = True
                                                     break
-                                        except:
-                                            break
+                                        except Exception as e:
+                                            logger.debug(f"Error finding parent: {e}")
+                                            continue
                                     
                                     # If we couldn't find a good parent, use the element itself
                                     if not found:
@@ -325,7 +344,9 @@ class TikTokStreakBot:
             return self.contacts_found
             
         except Exception as e:
-            logger.error(f"Error finding contacts: {e}")
+            error_msg = f"Error finding contacts: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Contact Search Error</b>\n{error_msg}")
             return []
     
     def send_message(self, contact):
@@ -369,7 +390,8 @@ class TikTokStreakBot:
             time.sleep(0.5)
             
             # Type the message
-            input_field.input(STREAK_MESSAGE)
+            message_to_send = self.custom_message if self.custom_message else STREAK_MESSAGE
+            input_field.input(message_to_send)
             time.sleep(0.5)
             
             # Find and click send button, or press Enter
@@ -387,7 +409,10 @@ class TikTokStreakBot:
             return True
             
         except Exception as e:
-            logger.error(f"Error sending message to {contact.get('username', 'Unknown')}: {e}")
+            username = contact.get('username', 'Unknown')
+            error_msg = f"Error sending message to {username}: {e}"
+            logger.error(error_msg)
+            send_telegram(f"❌ <b>Message Send Error</b>\nFailed to send to: {username}\nError: {str(e)}")
             return False
     
     def send_all_messages(self):
@@ -498,25 +523,63 @@ def main():
     # Parse command line arguments
     args = sys.argv[1:]
     
+    # Check for help
+    if '--help' in args or '-h' in args:
+        print("""
+╔════════════════════════════════════════════════════════════╗
+║              🤖 TikTok Streak Bot - Help                  ║
+╚════════════════════════════════════════════════════════════╝
+
+Usage:
+  python streak_bot.py [OPTIONS]
+
+Options:
+  --now              Run bot immediately (send messages now)
+  --test             Test mode (find contacts but don't send)
+  --message "text"   Custom message to send (overrides config)
+  -m "text"          Short form of --message
+  --help, -h         Show this help message
+
+Examples:
+  python streak_bot.py --now
+  python streak_bot.py --test
+  python streak_bot.py --now --message "Streak hari ini!"
+  python streak_bot.py --test -m "Custom text"
+
+Default (no args):
+  Schedule bot to run daily at configured time
+        """)
+        return
+    
+    # Parse custom message
+    custom_message = None
+    for i, arg in enumerate(args):
+        if arg in ['--message', '-m']:
+            if i + 1 < len(args):
+                custom_message = args[i + 1]
+                logger.info(f"Using custom message: {custom_message}")
+            break
+    
     if '--now' in args:
         # Run immediately
         logger.info("Running bot immediately (--now flag)")
-        bot = TikTokStreakBot(headless=HEADLESS_MODE)
+        bot = TikTokStreakBot(headless=HEADLESS_MODE, custom_message=custom_message)
         bot.run()
         
     elif '--test' in args:
         # Test mode - find contacts but don't send
         logger.info("Running in test mode (--test flag)")
-        bot = TikTokStreakBot(headless=False, test_mode=True)
+        bot = TikTokStreakBot(headless=False, test_mode=True, custom_message=custom_message)
         bot.run()
         
     else:
         # Schedule mode - run daily at configured time
+        message_display = custom_message if custom_message else STREAK_MESSAGE
         print("\n" + "="*60)
         print("🤖 TikTok Streak Bot")
         print("="*60)
         print(f"\n📅 Scheduled to run daily at: {SCHEDULE_TIME}")
-        print(f"📝 Message: \"{STREAK_MESSAGE}\"")
+        print(f"📝 Message: \"{message_display}\"")
         print(f"\n⏳ Waiting for scheduled time...")
         print("   Press Ctrl+C to stop\n")
         print("="*60 + "\n")

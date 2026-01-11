@@ -31,9 +31,13 @@ from config import (
     LOGS_DIR,
     SCHEDULE_TIME,
     HEADLESS_MODE,
+    STREAK_MESSAGE,
     LOG_FORMAT,
     LOG_DATE_FORMAT,
 )
+
+# Global variable for custom message
+custom_message = None
 
 
 # Set up logging
@@ -108,6 +112,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/add {nickname} - Add a contact\n"
         "/remove {nickname} - Remove a contact\n"
         "/list - Show all contacts\n"
+        "/text {message} - Change streak message\n"
+        "/status - Show current config\n"
         "/run - Run streak bot now\n"
         "/help - Show this message",
         parse_mode='HTML'
@@ -126,6 +132,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/add {nickname} - Add contact\n"
         "/remove {nickname} - Remove contact\n"
         "/list - Show all contacts\n"
+        "/text {message} - Change streak message\n"
+        "/status - Show current config\n"
         "/run - Run streak bot now\n"
         "/help - Show this message\n\n"
         f"<b>Scheduled:</b> Daily at {SCHEDULE_TIME}",
@@ -234,6 +242,61 @@ async def list_contacts(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def text_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /text command to change streak message."""
+    global custom_message
+    
+    if not is_authorized(update):
+        await update.message.reply_text("You are not authorized to use this bot.")
+        return
+    
+    if not context.args:
+        await update.message.reply_text(
+            "<b>Change Streak Message</b>\n\n"
+            "Please provide a message!\n\n"
+            "<b>Usage:</b>\n"
+            "<code>/text Streak hari ini! 🔥</code>\n\n"
+            "<b>Example:</b>\n"
+            "<code>/text Jangan lupa streak kita ya!</code>",
+            parse_mode='HTML'
+        )
+        return
+    
+    new_message = ' '.join(context.args)
+    custom_message = new_message
+    
+    logger.info(f"Streak message changed via Telegram: {new_message}")
+    
+    await update.message.reply_text(
+        f"<b>✅ Message Updated!</b>\n\n"
+        f"📝 New message:\n<code>{new_message}</code>\n\n"
+        f"Message akan digunakan untuk pengiriman berikutnya.",
+        parse_mode='HTML'
+    )
+
+
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /status command to show current configuration."""
+    global custom_message
+    
+    if not is_authorized(update):
+        await update.message.reply_text("You are not authorized to use this bot.")
+        return
+    
+    contacts = load_contacts()
+    current_msg = custom_message if custom_message else STREAK_MESSAGE
+    
+    await update.message.reply_text(
+        f"<b>📊 Bot Status</b>\n\n"
+        f"⏰ <b>Schedule:</b> Daily at {SCHEDULE_TIME}\n"
+        f"👥 <b>Contacts:</b> {len(contacts)}\n"
+        f"📝 <b>Current Message:</b>\n<code>{current_msg}</code>\n\n"
+        f"🎯 <b>Mode:</b> {'Headless' if HEADLESS_MODE else 'Visible Browser'}\n"
+        f"✅ <b>Status:</b> Online & Active",
+        parse_mode='HTML'
+    )
+
+
 async def run_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /run command - manually trigger the streak bot."""
     if not is_authorized(update):
@@ -250,8 +313,13 @@ async def run_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         bot_script = os.path.join(script_dir, 'streak_bot.py')
         
+        # Build command with custom message if set
+        cmd = [sys.executable, bot_script, '--now']
+        if custom_message:
+            cmd.extend(['--message', custom_message])
+        
         process = subprocess.Popen(
-            [sys.executable, bot_script, '--now'],
+            cmd,
             cwd=script_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
@@ -291,8 +359,13 @@ def run_scheduled_streak():
         script_dir = os.path.dirname(os.path.abspath(__file__))
         bot_script = os.path.join(script_dir, 'streak_bot.py')
         
+        # Build command with custom message if set
+        cmd = [sys.executable, bot_script, '--now']
+        if custom_message:
+            cmd.extend(['--message', custom_message])
+        
         process = subprocess.Popen(
-            [sys.executable, bot_script, '--now'],
+            cmd,
             cwd=script_dir,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
@@ -354,6 +427,8 @@ def main():
     application.add_handler(CommandHandler("add", add_contact))
     application.add_handler(CommandHandler("remove", remove_contact))
     application.add_handler(CommandHandler("list", list_contacts))
+    application.add_handler(CommandHandler("text", text_command))
+    application.add_handler(CommandHandler("status", status_command))
     application.add_handler(CommandHandler("run", run_bot_command))
     
     # Send startup notification
