@@ -383,6 +383,7 @@ class TikTokStreakBot:
     def send_message(self, contact):
         """
         Send a streak message to a specific contact.
+        Advanced version with retry mechanism and multiple strategies.
         
         Args:
             contact: Dictionary with contact info and element
@@ -390,61 +391,184 @@ class TikTokStreakBot:
         Returns:
             bool: True if message sent successfully
         """
+        username = contact.get('username', 'Unknown')
+        max_retries = 3
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                logger.info(f"📤 Sending message to: {username} (Attempt {attempt}/{max_retries})")
+                
+                # Strategy 1: Re-find by nickname with multiple selectors
+                contact_element = self._find_contact_element(username)
+                
+                if not contact_element:
+                    logger.warning(f"Strategy 1 failed for {username}, trying strategy 2...")
+                    
+                    # Strategy 2: Scroll and retry
+                    self._scroll_messages_list()
+                    time.sleep(1)
+                    contact_element = self._find_contact_element(username)
+                
+                if not contact_element:
+                    logger.warning(f"Strategy 2 failed for {username}, trying strategy 3...")
+                    
+                    # Strategy 3: Refresh message list and retry
+                    self.page.refresh()
+                    time.sleep(PAGE_LOAD_WAIT)
+                    contact_element = self._find_contact_element(username)
+                
+                if not contact_element:
+                    raise Exception(f"Could not find contact element after all strategies")
+                
+                # Click on the conversation to open it
+                logger.debug(f"Clicking on contact: {username}")
+                try:
+                    contact_element.click()
+                except:
+                    # If click fails, try JS click
+                    logger.debug("Normal click failed, trying JS click...")
+                    self.page.run_js(f"arguments[0].click();", contact_element)
+                
+                time.sleep(ELEMENT_WAIT)
+                
+                # Find the message input field with multiple attempts
+                input_field = self._find_message_input()
+                
+                if not input_field:
+                    raise Exception(f"Could not find message input for {username}")
+                
+                # Click on input field to focus
+                input_field.click()
+                time.sleep(0.5)
+                
+                # Type the message
+                message_to_send = self.custom_message if self.custom_message else STREAK_MESSAGE
+                input_field.input(message_to_send)
+                time.sleep(0.5)
+                
+                # Find and click send button, or press Enter
+                send_button = self.page.ele('css:button[data-e2e="send-button"], button[class*="send"], button[class*="Send"]')
+                
+                if send_button:
+                    send_button.click()
+                else:
+                    # Press Enter to send
+                    input_field.input('\\n')
+                
+                time.sleep(MESSAGE_SEND_DELAY)
+                
+                logger.info(f"✅ Message sent to: {username}")
+                return True
+                
+            except Exception as e:
+                logger.warning(f"Attempt {attempt} failed for {username}: {e}")
+                
+                if attempt < max_retries:
+                    logger.info(f"Retrying in 2 seconds...")
+                    time.sleep(2)
+                else:
+                    # All retries exhausted
+                    error_msg = f"Failed to send to {username} after {max_retries} attempts: {e}"
+                    logger.error(error_msg)
+                    send_telegram(f"❌ <b>Message Send Error</b>\nFailed to send to: {username}\nError: {str(e)}\nRetries: {max_retries}")
+                    return False
+        
+        return False
+    
+    def _find_contact_element(self, username):
+        """
+        Find contact element by username with multiple strategies.
+        
+        Args:
+            username: Contact username to find
+            
+        Returns:
+            Element if found, None otherwise
+        """
+        logger.debug(f"Finding contact element for: {username}")
+        
+        # Try to find by nickname text
+        nickname_selectors = [
+            'css:p[class*="PInfoNickname"]',
+            'css:p[class*="Nickname"]',
+            'css:span[class*="Nickname"]',
+            'css:div[class*="Nickname"]',
+        ]
+        
+        for selector in nickname_selectors:
+            try:
+                elements = self.page.eles(selector)
+                for elem in elements:
+                    if elem.text and elem.text.strip().lower() == username.lower():
+                        # Find parent container to click
+                        parent = elem
+                        for _ in range(10):
+                            try:
+                                parent = parent.parent()
+                                if parent:
+                                    parent_class = parent.attr('class') or ''
+                                    if 'Item' in parent_class or 'item' in parent_class or 'Container' in parent_class:
+                                        logger.debug(f"Found contact via selector: {selector}")
+                                        return parent
+                            except:
+                                break
+            except:
+                continue
+        
+        # Fallback: Try xpath
         try:
-            username = contact.get('username', 'Unknown')
-            element = contact.get('element')
-            
-            logger.info(f"📤 Sending message to: {username}")
-            
-            # Click on the conversation to open it
-            element.click()
-            time.sleep(ELEMENT_WAIT)
-            
-            # Find the message input field
-            input_field = self.page.ele('css:div[data-e2e="message-input"]')
-            
-            if not input_field:
-                input_field = self.page.ele('css:div[contenteditable="true"]')
-            
-            if not input_field:
-                input_field = self.page.ele('css:textarea[placeholder*="message"], input[placeholder*="message"]')
-            
-            if not input_field:
-                input_field = self.page.ele('css:div[class*="Input"] div[contenteditable="true"]')
-            
-            if not input_field:
-                logger.error(f"Could not find message input for {username}")
-                return False
-            
-            # Click on input field to focus
-            input_field.click()
+            elem = self.page.ele(f'xpath://*[text()="{username}"]')
+            if elem:
+                logger.debug(f"Found contact via exact xpath")
+                return elem
+        except:
+            pass
+        
+        try:
+            elem = self.page.ele(f'xpath://*[contains(text(), "{username}")]')
+            if elem:
+                logger.debug(f"Found contact via contains xpath")
+                return elem
+        except:
+            pass
+        
+        return None
+    
+    def _find_message_input(self):
+        """
+        Find message input field with multiple selectors.
+        
+        Returns:
+            Input element if found, None otherwise
+        """
+        selectors = [
+            'css:div[data-e2e="message-input"]',
+            'css:div[contenteditable="true"]',
+            'css:textarea[placeholder*="message"]',
+            'css:input[placeholder*="message"]',
+            'css:div[class*="Input"] div[contenteditable="true"]',
+        ]
+        
+        for selector in selectors:
+            try:
+                elem = self.page.ele(selector, timeout=2)
+                if elem:
+                    logger.debug(f"Found input via: {selector}")
+                    return elem
+            except:
+                continue
+        
+        return None
+    
+    def _scroll_messages_list(self):
+        """Scroll the messages list to load more contacts."""
+        try:
+            logger.debug("Scrolling messages list...")
+            self.page.run_js("window.scrollBy(0, -500);")
             time.sleep(0.5)
-            
-            # Type the message
-            message_to_send = self.custom_message if self.custom_message else STREAK_MESSAGE
-            input_field.input(message_to_send)
-            time.sleep(0.5)
-            
-            # Find and click send button, or press Enter
-            send_button = self.page.ele('css:button[data-e2e="send-button"], button[class*="send"], button[class*="Send"]')
-            
-            if send_button:
-                send_button.click()
-            else:
-                # Press Enter to send
-                input_field.input('\n')
-            
-            time.sleep(MESSAGE_SEND_DELAY)
-            
-            logger.info(f"✅ Message sent to: {username}")
-            return True
-            
+            self.page.run_js("window.scrollBy(0, 500);")
         except Exception as e:
-            username = contact.get('username', 'Unknown')
-            error_msg = f"Error sending message to {username}: {e}"
-            logger.error(error_msg)
-            send_telegram(f"❌ <b>Message Send Error</b>\nFailed to send to: {username}\nError: {str(e)}")
-            return False
+            logger.debug(f"Scroll failed: {e}")
     
     def send_all_messages(self):
         """Send messages to all found contacts."""
