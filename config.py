@@ -37,7 +37,7 @@ TELEGRAM_LOG_ENABLED = True  # Set to False to disable Telegram logging
 
 # Minimum log level to send to Telegram (INFO, WARNING, ERROR)
 import logging
-TELEGRAM_LOG_LEVEL = logging.INFO  # Change to logging.WARNING for only warnings/errors
+TELEGRAM_LOG_LEVEL = logging.WARNING  # Only send warnings and errors to avoid spam
 
 # =============================================================================
 # File Paths

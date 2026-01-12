@@ -582,8 +582,9 @@ class TikTokStreakBot:
                 if send_button:
                     send_button.click()
                 else:
-                    # Press Enter to send
-                    input_field.input('\\n')
+                    # Press Enter to send (use Keys.ENTER instead of literal \n)
+                    from DrissionPage.common import Keys
+                    input_field.input(Keys.ENTER)
                 
                 time.sleep(MESSAGE_SEND_DELAY)
                 
