@@ -32,6 +32,13 @@ TELEGRAM_CHAT_ID = "5673885457"
 # Enable/disable Telegram notifications
 TELEGRAM_ENABLED = True
 
+# Send logger messages to Telegram automatically
+TELEGRAM_LOG_ENABLED = True  # Set to False to disable Telegram logging
+
+# Minimum log level to send to Telegram (INFO, WARNING, ERROR)
+import logging
+TELEGRAM_LOG_LEVEL = logging.INFO  # Change to logging.WARNING for only warnings/errors
+
 # =============================================================================
 # File Paths
 # =============================================================================

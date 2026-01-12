@@ -37,22 +37,90 @@ from config import (
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_CHAT_ID,
     TELEGRAM_ENABLED,
+    TELEGRAM_LOG_ENABLED,
+    TELEGRAM_LOG_LEVEL,
 )
+
+
+# =============================================================================
+# Telegram Logging Handler
+# =============================================================================
+
+class TelegramHandler(logging.Handler):
+    """Custom logging handler that sends log messages to Telegram."""
+    
+    def __init__(self):
+        super().__init__()
+        self.last_send_time = 0
+        self.min_interval = 1  # Minimum 1 second between messages to avoid spam
+        
+    def emit(self, record):
+        """Send log record to Telegram."""
+        if not TELEGRAM_ENABLED or not TELEGRAM_LOG_ENABLED:
+            return
+        
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return
+        
+        try:
+            # Rate limiting
+            current_time = time.time()
+            if current_time - self.last_send_time < self.min_interval:
+                return
+            
+            # Format message with emoji based on log level
+            emoji_map = {
+                'DEBUG': '🔵',
+                'INFO': 'ℹ️',
+                'WARNING': '⚠️',
+                'ERROR': '❌',
+                'CRITICAL': '🚨'
+            }
+            
+            emoji = emoji_map.get(record.levelname, '📝')
+            timestamp = datetime.fromtimestamp(record.created).strftime('%H:%M:%S')
+            
+            # Format message
+            message = f"{emoji} <b>{record.levelname}</b> [{timestamp}]\n{record.getMessage()}"
+            
+            # Send to Telegram
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = {
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            }
+            
+            requests.post(url, data=data, timeout=5)
+            self.last_send_time = current_time
+            
+        except Exception:
+            # Silently fail - don't want logging errors to crash the app
+            pass
 
 
 # Set up logging
 def setup_logging():
-    """Configure logging to both file and console."""
+    """Configure logging to file, console, and Telegram."""
     log_filename = os.path.join(LOGS_DIR, f"streak_bot_{datetime.now().strftime('%Y%m%d')}.log")
+    
+    # Create handlers list
+    handlers = [
+        logging.FileHandler(log_filename, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+    
+    # Add Telegram handler if enabled
+    if TELEGRAM_ENABLED and TELEGRAM_LOG_ENABLED:
+        telegram_handler = TelegramHandler()
+        telegram_handler.setLevel(TELEGRAM_LOG_LEVEL)
+        handlers.append(telegram_handler)
     
     logging.basicConfig(
         level=logging.INFO,
         format=LOG_FORMAT,
         datefmt=LOG_DATE_FORMAT,
-        handlers=[
-            logging.FileHandler(log_filename, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=handlers
     )
     return logging.getLogger(__name__)
 
@@ -220,35 +288,97 @@ class TikTokStreakBot:
             if 'messages' in current_url:
                 logger.info("✅ Login verified - on messages page")
                 
-                # Handle "Maybe later" popup if it appears
+                # Handle "Maybe later" popup if it appears (Passkey modal)
                 try:
                     logger.info("Checking for popups...")
-                    time.sleep(2)  # Wait for potential popup to appear
+                    time.sleep(3)  # Wait for potential popup to appear
                     
-                    # Try to find and click "Maybe later" button
-                    maybe_later_selectors = [
-                        'xpath://button[contains(text(), "Maybe later")]',
-                        'xpath://button[contains(text(), "maybe later")]',
-                        'xpath://button[contains(text(), "MAYBE LATER")]',
-                        'xpath://span[contains(text(), "Maybe later")]/parent::button',
-                        'css:button[aria-label*="Maybe later"]',
-                        'css:button[class*="maybe"]',
-                    ]
+                    # Strategy 1: Try to find and close passkey modal
+                    # Using reverse engineering - detect modal by class and role attributes
+                    logger.debug("Strategy 1: Detecting modal by TUXModal class...")
+                    modal_detected = False
                     
-                    for selector in maybe_later_selectors:
+                    try:
+                        # Check if modal exists by class name
+                        modal = self.page.ele('css:div[class*="TUXModal"]', timeout=2)
+                        if modal:
+                            logger.info("✅ Passkey modal detected!")
+                            modal_detected = True
+                    except:
+                        logger.debug("No TUXModal found")
+                    
+                    # Also check by role=dialog
+                    if not modal_detected:
                         try:
-                            button = self.page.ele(selector, timeout=2)
-                            if button:
-                                logger.info("Found 'Maybe later' button, clicking...")
-                                button.click()
-                                time.sleep(1)
-                                logger.info("✅ Popup dismissed")
-                                break
+                            modal = self.page.ele('css:div[role="dialog"]', timeout=2)
+                            if modal:
+                                # Check if it contains passkey text
+                                modal_text = modal.text.lower() if modal.text else ""
+                                if "passkey" in modal_text or "create a passkey" in modal_text:
+                                    logger.info("✅ Passkey dialog detected by role!")
+                                    modal_detected = True
                         except:
-                            continue
+                            logger.debug("No dialog modal found")
+                    
+                    # Strategy 2: If modal detected, find and click "Maybe later" button
+                    if modal_detected:
+                        logger.info("Attempting to dismiss passkey popup...")
+                        
+                        # Reverse engineered selectors based on actual TikTok DOM
+                        maybe_later_selectors = [
+                            # Exact class match for TikTok secondary button
+                            'css:button.TUXButton--secondary',
+                            'css:button.TUXButton.TUXButton--secondary',
+                            
+                            # Text-based (most reliable)
+                            'xpath://button[.//div[contains(text(), "Maybe later")]]',
+                            'xpath://button[contains(., "Maybe later")]',
+                            'xpath://div[contains(@class, "TUXButton-label") and text()="Maybe later"]/ancestor::button',
+                            
+                            # Class combinations
+                            'css:button[class*="TUXButton"][class*="secondary"]',
+                            'css:button[class*="secondary"][aria-disabled="false"]',
+                            
+                            # Generic fallbacks
+                            'xpath://button[contains(text(), "Maybe later")]',
+                            'xpath://button[contains(text(), "maybe later")]',
+                            'xpath://span[contains(text(), "Maybe later")]/parent::button',
+                            'css:button[aria-label*="Maybe later"]',
+                        ]
+                        
+                        dismissed = False
+                        for selector in maybe_later_selectors:
+                            try:
+                                logger.debug(f"Trying selector: {selector}")
+                                button = self.page.ele(selector, timeout=2)
+                                if button:
+                                    logger.info(f"✅ Found 'Maybe later' button with: {selector}")
+                                    logger.debug("Clicking button...")
+                                    
+                                    # Try multiple click methods
+                                    try:
+                                        button.click()
+                                        dismissed = True
+                                    except:
+                                        # Fallback to JS click
+                                        logger.debug("Normal click failed, using JS click...")
+                                        self.page.run_js("arguments[0].click();", button)
+                                        dismissed = True
+                                    
+                                    time.sleep(1.5)
+                                    logger.info("✅ Passkey popup dismissed successfully!")
+                                    break
+                            except Exception as e:
+                                logger.debug(f"Selector {selector} failed: {e}")
+                                continue
+                        
+                        if not dismissed:
+                            logger.warning("⚠️ Modal detected but couldn't find dismiss button")
+                    else:
+                        logger.debug("No passkey modal detected - proceeding normally")
                     
                 except Exception as e:
-                    logger.debug(f"No popup found or error dismissing popup: {e}")
+                    logger.debug(f"Popup handling error: {e}")
                 
                 return True
             

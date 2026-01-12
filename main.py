@@ -34,26 +34,96 @@ from config import (
     STREAK_MESSAGE,
     LOG_FORMAT,
     LOG_DATE_FORMAT,
+    TELEGRAM_ENABLED,
+    TELEGRAM_LOG_ENABLED,
+    TELEGRAM_LOG_LEVEL,
 )
+import requests
 
 # Global variable for custom message
 custom_message = None
 
 
+# =============================================================================
+# Telegram Logging Handler
+# =============================================================================
+
+class TelegramHandler(logging.Handler):
+    """Custom logging handler that sends log messages to Telegram."""
+    
+    def __init__(self):
+        super().__init__()
+        self.last_send_time = 0
+        self.min_interval = 1  # Minimum 1 second between messages to avoid spam
+        
+    def emit(self, record):
+        """Send log record to Telegram."""
+        if not TELEGRAM_ENABLED or not TELEGRAM_LOG_ENABLED:
+            return
+        
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return
+        
+        try:
+            # Rate limiting
+            current_time = time.time()
+            if current_time - self.last_send_time < self.min_interval:
+                return
+            
+            # Format message with emoji based on log level
+            emoji_map = {
+                'DEBUG': '🔵',
+                'INFO': 'ℹ️',
+                'WARNING': '⚠️',
+                'ERROR': '❌',
+                'CRITICAL': '🚨'
+            }
+            
+            emoji = emoji_map.get(record.levelname, '📝')
+            timestamp = datetime.fromtimestamp(record.created).strftime('%H:%M:%S')
+            
+            # Format message
+            message = f"{emoji} <b>{record.levelname}</b> [{timestamp}]\n{record.getMessage()}"
+            
+            # Send to Telegram
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            data = {
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML"
+            }
+            
+            requests.post(url, data=data, timeout=5)
+            self.last_send_time = current_time
+            
+        except Exception:
+            # Silently fail - don't want logging errors to crash the app
+            pass
+
+
 # Set up logging
 def setup_logging():
-    """Configure logging to both file and console."""
+    """Configure logging to file, console, and Telegram."""
     os.makedirs(LOGS_DIR, exist_ok=True)
     log_filename = os.path.join(LOGS_DIR, f"streak_bot_{datetime.now().strftime('%Y%m%d')}.log")
+    
+    # Create handlers list
+    handlers = [
+        logging.FileHandler(log_filename, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+    
+    # Add Telegram handler if enabled
+    if TELEGRAM_ENABLED and TELEGRAM_LOG_ENABLED:
+        telegram_handler = TelegramHandler()
+        telegram_handler.setLevel(TELEGRAM_LOG_LEVEL)
+        handlers.append(telegram_handler)
     
     logging.basicConfig(
         level=logging.INFO,
         format=LOG_FORMAT,
         datefmt=LOG_DATE_FORMAT,
-        handlers=[
-            logging.FileHandler(log_filename, encoding='utf-8'),
-            logging.StreamHandler()
-        ]
+        handlers=handlers
     )
     return logging.getLogger(__name__)
 
