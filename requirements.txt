@@ -1,6 +1,14 @@
-DrissionPage>=4.0.0
-schedule>=1.2.0
-requests>=2.28.0
-python-telegram-bot>=20.0
+# Core API
 fastapi>=0.109.0
 uvicorn>=0.27.0
+python-dotenv>=1.0.0
+
+# Bot Dependencies
+DrissionPage>=4.0.0
+requests>=2.28.0
+
+# Telegram Notifications
+python-telegram-bot>=20.0
+
+# Scheduling (for standalone bot mode)
+schedule>=1.2.0

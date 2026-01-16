@@ -1,23 +1,20 @@
-# 🔥 TikTok Streak API
+# TikTok Streak API
 
-Automated TikTok streak reminder bot with REST API and Telegram bot controller.
+![Created by dewhush](https://img.shields.io/badge/Created%20by-dewhush-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-green)
 
-[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-green.svg)](https://fastapi.tiangolo.com)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+REST API for automating TikTok streak messages. Control your TikTok Streak Bot via API endpoints.
 
 ## ✨ Features
 
-- 🍪 **Cookie-based login** - No login required each time
-- 📨 **Auto messaging** - Sends customizable streak reminders
-- ⏰ **Daily scheduling** - Runs automatically at configured time
-- 🌐 **REST API** - Control bot via HTTP endpoints
-- 🤖 **Telegram Bot** - Manage contacts and trigger from Telegram
-- 🛡️ **Anti-detection** - Uses DrissionPage to avoid automation checks
+- **FastAPI**: Modern, fast (high-performance) web framework
+- **Secure**: All configurations via environment variables - no hardcoded secrets
+- **API Key Auth**: Protected endpoints with `X-API-Key` header
+- **Telegram Notifications**: Get notified when streaks are sent
+- **Auto Documentation**: Swagger UI and ReDoc included
 
----
-
-## 🚀 Quick Start
+## 🛠️ Setup
 
 ### 1. Clone Repository
 
@@ -32,176 +29,158 @@ cd TikTok-Streak-API
 pip install -r requirements.txt
 ```
 
-### 3. Export TikTok Cookies
+### 3. Configure Environment
 
-1. Install browser extension: **Cookie-Editor** or **EditThisCookie**
-2. Login to TikTok in your browser
-3. Export cookies as JSON
-4. Save to `cookies.json` in project folder
+Copy the example environment file:
 
-Example format:
-```json
-[
-    {
-        "domain": ".tiktok.com",
-        "name": "sessionid",
-        "value": "your_session_id",
-        ...
-    }
-]
+```bash
+# Linux/Mac
+cp .env.example .env
+
+# Windows
+copy .env.example .env
 ```
 
-### 4. Add Target Contacts
+Edit `.env` and fill in your values:
+
+```env
+# Required
+API_KEY=your-secure-api-key-here
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+TELEGRAM_CHAT_ID=your-telegram-chat-id
+```
+
+### 4. Setup TikTok Cookies
+
+1. Login to TikTok in your browser
+2. Export cookies as `cookies.json` in the project root
+3. The bot will use these cookies to authenticate
+
+### 5. Add Contacts
 
 Create `contacts.json`:
+
 ```json
 {
-    "contacts": [
-        "friend1_nickname",
-        "friend2_nickname"
-    ]
+    "contacts": ["username1", "username2"]
 }
 ```
 
-> **Note:** Use the **display name/nickname** shown in TikTok messages, not username.
+## 🚀 Running the API
 
-### 5. Configure Settings
-
-Edit `config.py`:
-```python
-TELEGRAM_BOT_TOKEN = "your-bot-token"  # From @BotFather
-TELEGRAM_CHAT_ID = "your-chat-id"      # From @userinfobot
-SCHEDULE_TIME = "07:00"                 # Daily run time (24h format)
-STREAK_MESSAGE = "🔥 Streak!"           # Message to send
-```
-
----
-
-## 📖 Usage
-
-### Option 1: REST API
-
-```bash
-# Start API server
-python -m uvicorn api:app --host 0.0.0.0 --port 8000
-
-# Or use the batch file (Windows)
+**Windows (Batch Script):**
+```cmd
 run_api.bat
 ```
 
-**Swagger Docs:** http://localhost:8000/docs
-
-#### API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/status` | Get bot status |
-| `GET` | `/api/contacts` | List contacts |
-| `POST` | `/api/contacts` | Add contact |
-| `DELETE` | `/api/contacts/{nickname}` | Remove contact |
-| `POST` | `/api/run` | Run streak bot |
-
-#### Authentication
-
-All requests need `X-API-Key` header:
+**Manual:**
 ```bash
-curl -H "X-API-Key: your-secret-api-key-here" http://localhost:8000/api/status
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Set API key via environment variable `TIKTOK_API_KEY` or edit `api.py`.
-
----
-
-### Option 2: Telegram Bot
-
+**Python:**
 ```bash
-python main.py
-
-# Or use the batch file (Windows)
-run_tiktok_streak.bat
+python api.py
 ```
 
-#### Telegram Commands
+## 📚 API Documentation
 
-| Command | Description |
-|---------|-------------|
-| `/add {nickname}` | Add contact |
-| `/remove {nickname}` | Remove contact |
-| `/list` | Show all contacts |
-| `/text {message}` | Change streak message |
-| `/run` | Run streak bot now |
-| `/status` | Show bot status |
+Once running, access:
 
----
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-### Option 3: Direct Script
+### Endpoints
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/` | ❌ | Welcome message |
+| `GET` | `/health` | ❌ | Health check |
+| `GET` | `/status` | ❌ | Server status |
+| `POST` | `/v1/streak` | ✅ | Run streak bot |
+| `GET` | `/v1/contacts` | ✅ | List contacts |
+| `POST` | `/v1/contacts` | ✅ | Add contact |
+| `DELETE` | `/v1/contacts/{nickname}` | ✅ | Remove contact |
+
+### Authentication
+
+Protected endpoints require `X-API-Key` header:
 
 ```bash
-# Run immediately
-python streak_bot.py --now
-
-# Test mode (find contacts, don't send)
-python streak_bot.py --test
-
-# Custom message
-python streak_bot.py --now --message "Streak hari ini! 🔥"
-
-# Schedule mode (runs at configured time)
-python streak_bot.py
+curl -X GET "http://localhost:8000/v1/contacts" \
+  -H "X-API-Key: your-api-key-here"
 ```
 
----
+### Example Requests
 
-## 📁 File Structure
+**Run Streak Bot:**
+```bash
+curl -X POST "http://localhost:8000/v1/streak" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hey! Streak time 🔥"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Streak bot started in background",
+  "data": {
+    "custom_message": "Hey! Streak time 🔥",
+    "started_at": "2026-01-17T01:30:00.000000"
+  }
+}
+```
+
+**Add Contact:**
+```bash
+curl -X POST "http://localhost:8000/v1/contacts" \
+  -H "X-API-Key: your-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"nickname": "friend_username"}'
+```
+
+**List Contacts:**
+```bash
+curl -X GET "http://localhost:8000/v1/contacts" \
+  -H "X-API-Key: your-api-key-here"
+```
+
+**Remove Contact:**
+```bash
+curl -X DELETE "http://localhost:8000/v1/contacts/friend_username" \
+  -H "X-API-Key: your-api-key-here"
+```
+
+## 📁 Project Structure
 
 ```
 TikTok-Streak-API/
-├── api.py               # REST API (FastAPI)
-├── main.py              # Telegram bot + scheduler
-├── streak_bot.py        # Core bot logic
-├── config.py            # Configuration
-├── requirements.txt     # Dependencies
-├── cookies.json         # Your TikTok cookies (create this)
-├── contacts.json        # Target contacts (create this)
-├── run_api.bat          # Start API server (Windows)
-├── run_tiktok_streak.bat # Start Telegram bot (Windows)
-└── logs/                # Log files
+├── api.py              # FastAPI app & routes
+├── config.py           # Configuration (loads from .env)
+├── streak_bot.py       # Main bot logic
+├── requirements.txt    # Python dependencies
+├── .env.example        # Environment template
+├── .gitignore          # Git exclusions
+├── run_api.bat         # Windows startup script
+└── README.md           # This file
 ```
 
----
+## ⚠️ Security Notes
 
-## ⚙️ Configuration Reference
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `STREAK_MESSAGE` | `"🔥 Streak Reminder 🔥"` | Message to send |
-| `SCHEDULE_TIME` | `"00:00"` | Daily run time (24h) |
-| `HEADLESS_MODE` | `False` | Run without visible browser |
-| `TELEGRAM_ENABLED` | `True` | Enable Telegram notifications |
-
----
-
-## 🔧 Troubleshooting
-
-| Error | Solution |
-|-------|----------|
-| "Cookies file not found" | Export TikTok cookies to `cookies.json` |
-| "Not logged in" | Cookies expired, export fresh cookies |
-| "Could not find contacts" | Check nickname matches exactly (case-sensitive) |
-| "Bot timed out" | Auto-retries 3x, check for TikTok popups |
-
----
-
-## ⚠️ Disclaimer
-
-This project is for **educational purposes only**. Automated actions may violate TikTok's Terms of Service. Use responsibly and at your own risk.
-
----
+- **Never commit `.env`** - Contains your secrets
+- **Never commit `cookies.json`** - Contains session data
+- **Never commit `contacts.json`** - Contains user data
+- **Use strong API keys** - Generate random secure keys
+- **Rotate Telegram tokens** - If exposed, regenerate via @BotFather
 
 ## 📄 License
 
-MIT License - feel free to use and modify!
+MIT License - See LICENSE file for details.
 
 ---
 
-Made with ❤️ by [dewhush](https://github.com/dewhush)
+## 👤 Credits
+
+**Created by dewhush**

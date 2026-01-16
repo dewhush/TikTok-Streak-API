@@ -1,6 +1,5 @@
-# Logs
-logs/
-*.log
+# Environment
+.env
 
 # Python
 __pycache__/
@@ -12,6 +11,10 @@ venv/
 env/
 .venv/
 
+# Logs
+logs/
+*.log
+
 # IDE
 .vscode/
 .idea/
@@ -22,7 +25,12 @@ env/
 .DS_Store
 Thumbs.db
 
-# Sensitive files - DO NOT COMMIT!
-config.py
+# Security - NEVER COMMIT THESE
+*.key
+*.pem
 cookies.json
 contacts.json
+
+# Temporary
+*.tmp
+*.bak
