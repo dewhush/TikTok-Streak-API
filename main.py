@@ -368,53 +368,79 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def run_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /run command - manually trigger the streak bot."""
+    """Handle /run command - manually trigger the streak bot with auto-retry on timeout."""
     if not is_authorized(update):
         await update.message.reply_text("You are not authorized to use this bot.")
         return
     
+    max_retries = 3
+    timeout_seconds = 300  # 5 minutes
+    
     await update.message.reply_text(
         "<b>Running Streak Bot...</b>\n\n"
-        "Please wait, this may take a minute.",
+        "Please wait, this may take a minute.\n"
+        f"(Auto-retry up to {max_retries}x if timeout occurs)",
         parse_mode='HTML'
     )
     
-    try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        bot_script = os.path.join(script_dir, 'streak_bot.py')
-        
-        # Build command with custom message if set
-        cmd = [sys.executable, bot_script, '--now']
-        if custom_message:
-            cmd.extend(['--message', custom_message])
-        
-        process = subprocess.Popen(
-            cmd,
-            cwd=script_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        stdout, stderr = process.communicate(timeout=300)
-        
-        if process.returncode == 0:
-            await update.message.reply_text(
-                "<b>Streak Bot Completed!</b>\n\n"
-                "Check the notification for details.",
-                parse_mode='HTML'
-            )
-        else:
-            await update.message.reply_text(
-                f"<b>Bot finished with errors</b>\n\n"
-                f"Exit code: {process.returncode}",
-                parse_mode='HTML'
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bot_script = os.path.join(script_dir, 'streak_bot.py')
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Running streak bot - Attempt {attempt}/{max_retries}")
+            
+            # Build command with custom message if set
+            cmd = [sys.executable, bot_script, '--now']
+            if custom_message:
+                cmd.extend(['--message', custom_message])
+            
+            process = subprocess.Popen(
+                cmd,
+                cwd=script_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
             
-    except subprocess.TimeoutExpired:
-        process.kill()
-        await update.message.reply_text("Bot timed out after 5 minutes.")
-    except Exception as e:
-        await update.message.reply_text(f"Error running bot: {e}")
+            stdout, stderr = process.communicate(timeout=timeout_seconds)
+            
+            if process.returncode == 0:
+                await update.message.reply_text(
+                    "<b>✅ Streak Bot Completed!</b>\n\n"
+                    "Check the notification for details.",
+                    parse_mode='HTML'
+                )
+                return  # Success, exit function
+            else:
+                await update.message.reply_text(
+                    f"<b>Bot finished with errors</b>\n\n"
+                    f"Exit code: {process.returncode}",
+                    parse_mode='HTML'
+                )
+                return  # Non-timeout error, don't retry
+                
+        except subprocess.TimeoutExpired:
+            process.kill()
+            logger.warning(f"Bot timed out (attempt {attempt}/{max_retries}) - possible popup blocking")
+            
+            if attempt < max_retries:
+                await update.message.reply_text(
+                    f"⚠️ <b>Timeout (Attempt {attempt}/{max_retries})</b>\n\n"
+                    "Bot timed out after 5 minutes.\n"
+                    "Possible popup blocking. Retrying...",
+                    parse_mode='HTML'
+                )
+                time.sleep(3)  # Brief delay before retry
+            else:
+                await update.message.reply_text(
+                    f"❌ <b>Failed after {max_retries} attempts</b>\n\n"
+                    "Bot kept timing out. Please check manually.",
+                    parse_mode='HTML'
+                )
+                
+        except Exception as e:
+            await update.message.reply_text(f"Error running bot: {e}")
+            return  # Non-timeout error, don't retry
 
 
 # =============================================================================
@@ -422,30 +448,53 @@ async def run_bot_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # =============================================================================
 
 def run_scheduled_streak():
-    """Run the streak bot (called by scheduler)."""
+    """Run the streak bot with auto-retry on timeout (called by scheduler)."""
     logger.info(f"Scheduled job triggered at {SCHEDULE_TIME}")
     
-    try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        bot_script = os.path.join(script_dir, 'streak_bot.py')
-        
-        # Build command with custom message if set
-        cmd = [sys.executable, bot_script, '--now']
-        if custom_message:
-            cmd.extend(['--message', custom_message])
-        
-        process = subprocess.Popen(
-            cmd,
-            cwd=script_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        stdout, stderr = process.communicate(timeout=300)
-        logger.info(f"Scheduled job completed with exit code: {process.returncode}")
-        
-    except Exception as e:
-        logger.error(f"Scheduled job failed: {e}")
+    max_retries = 3
+    timeout_seconds = 300  # 5 minutes
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bot_script = os.path.join(script_dir, 'streak_bot.py')
+    
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"Running scheduled streak - Attempt {attempt}/{max_retries}")
+            
+            # Build command with custom message if set
+            cmd = [sys.executable, bot_script, '--now']
+            if custom_message:
+                cmd.extend(['--message', custom_message])
+            
+            process = subprocess.Popen(
+                cmd,
+                cwd=script_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            stdout, stderr = process.communicate(timeout=timeout_seconds)
+            logger.info(f"Scheduled job completed with exit code: {process.returncode}")
+            
+            if process.returncode == 0:
+                return  # Success, exit function
+            else:
+                logger.warning(f"Bot exited with code {process.returncode}")
+                return  # Non-timeout error, don't retry
+                
+        except subprocess.TimeoutExpired:
+            process.kill()
+            logger.warning(f"Bot timed out (attempt {attempt}/{max_retries}) - possible popup blocking")
+            
+            if attempt < max_retries:
+                logger.info(f"Retrying in 3 seconds... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(3)  # Brief delay before retry
+            else:
+                logger.error(f"Scheduled job failed after {max_retries} timeout attempts")
+                
+        except Exception as e:
+            logger.error(f"Scheduled job failed: {e}")
+            return  # Non-timeout error, don't retry
 
 
 def scheduler_thread():

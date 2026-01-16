@@ -1,29 +1,45 @@
-# 🔥 TikTok Streak Bot
+# 🔥 TikTok Streak API
 
-An automated bot that sends streak reminder messages to specified TikTok contacts using DrissionPage for browser automation.
+Automated TikTok streak reminder bot with REST API and Telegram bot controller.
 
-## Features
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-green.svg)](https://fastapi.tiangolo.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- 🍪 **Cookie-based login** - Uses exported cookies (no login each time)
-- 📋 **Contact list** - Specify exactly which users to message in `contacts.json`
+## ✨ Features
+
+- 🍪 **Cookie-based login** - No login required each time
 - 📨 **Auto messaging** - Sends customizable streak reminders
-- ⏰ **Daily scheduling** - Runs automatically at 7 AM
+- ⏰ **Daily scheduling** - Runs automatically at configured time
+- 🌐 **REST API** - Control bot via HTTP endpoints
+- 🤖 **Telegram Bot** - Manage contacts and trigger from Telegram
 - 🛡️ **Anti-detection** - Uses DrissionPage to avoid automation checks
 
-## Installation
+---
 
-### 1. Install Python Dependencies
+## 🚀 Quick Start
+
+### 1. Clone Repository
 
 ```bash
-cd "c:\Users\dewan\Desktop\Dew Project\TikTok Streak"
+git clone https://github.com/dewhush/TikTok-Streak-API.git
+cd TikTok-Streak-API
+```
+
+### 2. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Setup Cookies
+### 3. Export TikTok Cookies
 
-Export your TikTok cookies using a browser extension (like "Cookie-Editor" or "EditThisCookie") and save them to `cookies.json`.
+1. Install browser extension: **Cookie-Editor** or **EditThisCookie**
+2. Login to TikTok in your browser
+3. Export cookies as JSON
+4. Save to `cookies.json` in project folder
 
-The format should be an array of cookie objects:
+Example format:
 ```json
 [
     {
@@ -35,160 +51,157 @@ The format should be an array of cookie objects:
 ]
 ```
 
-### 3. Add Target Contacts
+### 4. Add Target Contacts
 
-Edit `contacts.json` to add the TikTok usernames you want to message:
-
+Create `contacts.json`:
 ```json
 {
     "contacts": [
-        "friend1_username",
-        "friend2_username",
-        "friend3_username"
+        "friend1_nickname",
+        "friend2_nickname"
     ]
 }
 ```
 
-## Usage
+> **Note:** Use the **display name/nickname** shown in TikTok messages, not username.
 
-### Run with Daily Schedule (Recommended)
+### 5. Configure Settings
 
-```bash
-python streak_bot.py
+Edit `config.py`:
+```python
+TELEGRAM_BOT_TOKEN = "your-bot-token"  # From @BotFather
+TELEGRAM_CHAT_ID = "your-chat-id"      # From @userinfobot
+SCHEDULE_TIME = "07:00"                 # Daily run time (24h format)
+STREAK_MESSAGE = "🔥 Streak!"           # Message to send
 ```
 
-Runs at 7:00 AM daily. Keep terminal open.
+---
 
-### Run Immediately
+## 📖 Usage
 
-```bash
-python streak_bot.py --now
-```
-
-Sends messages right away, then exits.
-
-### Test Mode
+### Option 1: REST API
 
 ```bash
-python streak_bot.py --test
+# Start API server
+python -m uvicorn api:app --host 0.0.0.0 --port 8000
+
+# Or use the batch file (Windows)
+run_api.bat
 ```
 
-Finds contacts but **doesn't send messages**. Useful for testing.
+**Swagger Docs:** http://localhost:8000/docs
 
-### Custom Message
+#### API Endpoints
 
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/status` | Get bot status |
+| `GET` | `/api/contacts` | List contacts |
+| `POST` | `/api/contacts` | Add contact |
+| `DELETE` | `/api/contacts/{nickname}` | Remove contact |
+| `POST` | `/api/run` | Run streak bot |
+
+#### Authentication
+
+All requests need `X-API-Key` header:
 ```bash
-python streak_bot.py --now --message "Streak hari ini! 🔥"
+curl -H "X-API-Key: your-secret-api-key-here" http://localhost:8000/api/status
 ```
 
-Send custom message without editing `config.py`. Works with `--now` and `--test`:
+Set API key via environment variable `TIKTOK_API_KEY` or edit `api.py`.
 
-```bash
-# Test with custom message
-python streak_bot.py --test -m "Jangan lupa streak kita!"
+---
 
-# Send immediately with custom message
-python streak_bot.py --now --message "Streak reminder from Dew"
-```
-
-### Show Help
-
-```bash
-python streak_bot.py --help
-```
-
-Shows all available commands and options.
-
-## 🤖 Telegram Bot Controller
-
-Control bot via Telegram! Manage kontak, ganti message, dan kirim streak langsung dari Telegram.
-
-### Setup Telegram Bot
-
-1. Make sure `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured in `config.py`
-2. Run the main bot (includes Telegram controller + scheduler):
+### Option 2: Telegram Bot
 
 ```bash
 python main.py
+
+# Or use the batch file (Windows)
+run_tiktok_streak.bat
 ```
 
-Keep this running - bot will listen for Telegram commands AND run scheduled streaks.
+#### Telegram Commands
 
-### Available Commands
+| Command | Description |
+|---------|-------------|
+| `/add {nickname}` | Add contact |
+| `/remove {nickname}` | Remove contact |
+| `/list` | Show all contacts |
+| `/text {message}` | Change streak message |
+| `/run` | Run streak bot now |
+| `/status` | Show bot status |
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `/start` | Welcome message & help | `/start` |
-| `/text [message]` | Change streak message | `/text Streak hari ini! 🔥` |
-| `/send` | Send messages immediately | `/send` |
-| `/test` | Test mode (find contacts, no send) | `/test` |
-| `/status` | Show current configuration | `/status` |
-| `/help` | Show help message | `/help` |
+---
 
-### Usage Examples
+### Option 3: Direct Script
 
-**Ganti message:**
-```
-/text Jangan lupa streak kita ya!
-```
+```bash
+# Run immediately
+python streak_bot.py --now
 
-**Kirim sekarang:**
-```
-/send
-```
+# Test mode (find contacts, don't send)
+python streak_bot.py --test
 
-**Test dulu (cek kontak tanpa kirim):**
-```
-/test
-```
+# Custom message
+python streak_bot.py --now --message "Streak hari ini! 🔥"
 
-**Cek status & message saat ini:**
-```
-/status
+# Schedule mode (runs at configured time)
+python streak_bot.py
 ```
 
-## Configuration
+---
 
-Edit `config.py` to customize:
+## 📁 File Structure
+
+```
+TikTok-Streak-API/
+├── api.py               # REST API (FastAPI)
+├── main.py              # Telegram bot + scheduler
+├── streak_bot.py        # Core bot logic
+├── config.py            # Configuration
+├── requirements.txt     # Dependencies
+├── cookies.json         # Your TikTok cookies (create this)
+├── contacts.json        # Target contacts (create this)
+├── run_api.bat          # Start API server (Windows)
+├── run_tiktok_streak.bat # Start Telegram bot (Windows)
+└── logs/                # Log files
+```
+
+---
+
+## ⚙️ Configuration Reference
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `STREAK_MESSAGE` | `"Streak reminder -Dew Bot"` | Message to send |
-| `SCHEDULE_TIME` | `"07:00"` | Daily run time (24h format) |
+| `STREAK_MESSAGE` | `"🔥 Streak Reminder 🔥"` | Message to send |
+| `SCHEDULE_TIME` | `"00:00"` | Daily run time (24h) |
 | `HEADLESS_MODE` | `False` | Run without visible browser |
-| `MESSAGE_SEND_DELAY` | `2` | Seconds between messages |
+| `TELEGRAM_ENABLED` | `True` | Enable Telegram notifications |
 
-## File Structure
+---
 
-```
-TikTok Streak/
-├── main.py              # Main entry: Telegram bot + scheduler ⭐
-├── streak_bot.py        # Core bot logic
-├── config.py            # Configuration settings
-├── requirements.txt     # Python dependencies
-├── cookies.json         # Your TikTok cookies (export from browser)
-├── contacts.json        # List of usernames to message
-├── logs/                # Log files
-│   └── streak_bot_YYYYMMDD.log
-└── README.md            # This file
-```
+## 🔧 Troubleshooting
 
-## Troubleshooting
+| Error | Solution |
+|-------|----------|
+| "Cookies file not found" | Export TikTok cookies to `cookies.json` |
+| "Not logged in" | Cookies expired, export fresh cookies |
+| "Could not find contacts" | Check nickname matches exactly (case-sensitive) |
+| "Bot timed out" | Auto-retries 3x, check for TikTok popups |
 
-### "Cookies file not found"
-Export your TikTok cookies to `cookies.json` using a browser extension.
-
-### "Not logged in - redirected to login page"
-Your cookies have expired. Export fresh cookies from your browser.
-
-### "Could not find these contacts"
-Make sure the usernames in `contacts.json` match exactly and that you have an existing conversation with them.
-
-## Logs
-
-Logs are saved to the `logs/` directory with daily rotation:
-- `streak_bot_20260109.log`
+---
 
 ## ⚠️ Disclaimer
 
-This bot is for educational purposes. Automated actions may violate TikTok's Terms of Service. Use responsibly and at your own risk.
+This project is for **educational purposes only**. Automated actions may violate TikTok's Terms of Service. Use responsibly and at your own risk.
+
+---
+
+## 📄 License
+
+MIT License - feel free to use and modify!
+
+---
+
+Made with ❤️ by [dewhush](https://github.com/dewhush)
