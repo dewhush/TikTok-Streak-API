@@ -24,10 +24,10 @@ SCHEDULE_TIME = "00:00"
 # Telegram Notification Settings
 # =============================================================================
 # Get your bot token from @BotFather on Telegram
-TELEGRAM_BOT_TOKEN = "8568089554:AAERJBWnVY5W4iGxbkOoRQRJ50YBcGPFsLk"
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "your-bot-token-here")
 
 # Get your chat ID from @userinfobot or @get_id_bot on Telegram  
-TELEGRAM_CHAT_ID = "5673885457"
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "your-chat-id-here")
 
 # Enable/disable Telegram notifications
 TELEGRAM_ENABLED = True

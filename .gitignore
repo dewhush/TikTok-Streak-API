@@ -21,3 +21,8 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Sensitive files - DO NOT COMMIT!
+config.py
+cookies.json
+contacts.json
